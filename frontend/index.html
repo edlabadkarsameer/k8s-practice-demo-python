@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Employee Portal</title>
+</head>
+
+<body>
+
+    <h1>Employee Portal</h1>
+
+    <input id="name" placeholder="Employee Name">
+    <input id="email" placeholder="Employee Email">
+
+    <button onclick="addEmployee()">Add Employee</button>
+
+    <hr>
+
+    <div id="list"></div>
+
+<script>
+
+async function loadEmployees() {
+
+    try {
+
+        const response = await fetch("/api/employees");
+
+        if (!response.ok) {
+            throw new Error("Failed to fetch employees");
+        }
+
+        const employees = await response.json();
+
+        let html = "";
+
+        employees.forEach(emp => {
+            html += `
+                <p>
+                    <strong>${emp.name}</strong>
+                    (${emp.email})
+                </p>
+            `;
+        });
+
+        document.getElementById("list").innerHTML = html;
+
+    } catch (error) {
+
+        console.error(error);
+
+        document.getElementById("list").innerHTML =
+            "<p>Error loading employees</p>";
+    }
+}
+
+async function addEmployee() {
+
+    const name = document.getElementById("name").value;
+    const email = document.getElementById("email").value;
+
+    if (!name || !email) {
+        alert("Please enter name and email");
+        return;
+    }
+
+    try {
+
+        const response = await fetch(
+            `/api/employee?name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}`,
+            {
+                method: "POST"
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error("Failed to add employee");
+        }
+
+        document.getElementById("name").value = "";
+        document.getElementById("email").value = "";
+
+        loadEmployees();
+
+    } catch (error) {
+
+        console.error(error);
+
+        alert("Failed to add employee");
+    }
+}
+
+loadEmployees();
+
+</script>
+
+</body>
+</html>
