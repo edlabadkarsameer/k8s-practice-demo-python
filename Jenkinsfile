@@ -1,52 +1,100 @@
 pipeline {
 
- agent any
+    agent any
 
- stages {
+    environment {
 
-  stage('Git Checkout') {
+        DOCKER_USER_BACKEND = "edlabadkarsameer/k8s-practice-backend"
+        DOCKER_USER_FRONTEND = "edlabadkarsameer/k8s-practice-frontend"
 
-   steps {
-    git 'https://github.com/user/repo.git'
-   }
-  }
+    }
 
-  stage('Build Backend') {
+    stages {
 
-   steps {
-    sh 'docker build -t backend:latest backend/'
-   }
-  }
+        stage('Checkout') {
 
-  stage('Build Frontend') {
+            steps {
+                checkout scm
+            }
+        }
 
-   steps {
-    sh 'docker build -t frontend:latest frontend/'
-   }
-  }
+        stage('Build Backend') {
 
-  stage('Push Images') {
+            steps {
 
-   steps {
+                sh '''
+                docker build \
+                -t $DOCKER_USER_BACKEND:${BUILD_NUMBER} \
+                backend/
+                '''
+            }
+        }
 
-    sh '''
-    docker tag backend:latest edlabadkarsameer/k8s-practice-backend:latest
-    docker push edlabadkarsameer/k8s-practice-backend:latest
+        stage('Build Frontend') {
 
-    docker tag frontend:latest edlabadkarsameer/k8s-practice-frontend:latest
-    docker push edlabadkarsameer/k8s-practice-frontend:latest
-    '''
-   }
-  }
+            steps {
 
-  stage('Deploy') {
+                sh '''
+                docker build \
+                -t $DOCKER_USER_FRONTEND:${BUILD_NUMBER} \
+                frontend/
+                '''
+            }
+        }
 
-   steps {
+        stage('Docker Login') {
 
-    sh '''
-    kubectl apply -f kubernetes/
-    '''
-   }
-  }
- }
+            steps {
+
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-creds',
+                        usernameVariable: 'USER',
+                        passwordVariable: 'PASS'
+                    )
+                ]) {
+
+                    sh '''
+                    echo $PASS | docker login -u $USER --password-stdin
+                    '''
+                }
+            }
+        }
+
+        stage('Push Backend') {
+
+            steps {
+
+                sh '''
+                docker push $DOCKER_USER_BACKEND:${BUILD_NUMBER}
+                '''
+            }
+        }
+
+        stage('Push Frontend') {
+
+            steps {
+
+                sh '''
+                docker push $DOCKER_USER_FRONTEND:${BUILD_NUMBER}
+                '''
+            }
+        }
+
+        stage('Deploy') {
+
+            steps {
+
+                sh '''
+                kubectl set image deployment/backend \
+                backend=$DOCKER_USER_BACKEND:${BUILD_NUMBER} \
+                -n employee-app
+
+                kubectl set image deployment/frontend \
+                frontend=$DOCKER_USER_FRONTEND:${BUILD_NUMBER} \
+                -n employee-app
+                '''
+            }
+        }
+    }
 }
