@@ -1,100 +1,244 @@
 pipeline {
 
-    agent any
+```
+agent any
 
-    environment {
+parameters {
 
-        DOCKER_USER_BACKEND = "edlabadkarsameer/k8s-practice-backend"
-        DOCKER_USER_FRONTEND = "edlabadkarsameer/k8s-practice-frontend"
+    choice(
+        name: 'ENVIRONMENT',
+        choices: ['DEV', 'UAT', 'PROD'],
+        description: 'Select deployment environment'
+    )
 
+    booleanParam(
+        name: 'RUN_SECURITY_SCAN',
+        defaultValue: true,
+        description: 'Run security scan?'
+    )
+
+    string(
+        name: 'VERSION',
+        defaultValue: '1.0.0',
+        description: 'Application version'
+    )
+}
+
+environment {
+
+    APP_NAME = "employee-app"
+    OWNER = "sameer"
+}
+
+options {
+
+    disableConcurrentBuilds()
+
+    timeout(
+        time: 30,
+        unit: 'MINUTES'
+    )
+
+    buildDiscarder(
+        logRotator(
+            numToKeepStr: '10'
+        )
+    )
+}
+
+stages {
+
+    stage('Display Parameters') {
+
+        steps {
+
+            echo "Environment: ${params.ENVIRONMENT}"
+            echo "Version: ${params.VERSION}"
+            echo "Owner: ${OWNER}"
+        }
     }
 
-    stages {
+    stage('Parallel Jobs') {
 
-        stage('Checkout') {
+        parallel {
 
-            steps {
-                checkout scm
+            stage('Frontend Build') {
+
+                steps {
+
+                    echo "Building frontend..."
+                }
             }
-        }
 
-        stage('Build Backend') {
+            stage('Backend Build') {
 
-            steps {
+                steps {
 
-                sh '''
-                docker build \
-                -t $DOCKER_USER_BACKEND:${BUILD_NUMBER} \
-                backend/
-                '''
-            }
-        }
-
-        stage('Build Frontend') {
-
-            steps {
-
-                sh '''
-                docker build \
-                -t $DOCKER_USER_FRONTEND:${BUILD_NUMBER} \
-                frontend/
-                '''
-            }
-        }
-
-        stage('Docker Login') {
-
-            steps {
-
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'dockerhub-creds',
-                        usernameVariable: 'USER',
-                        passwordVariable: 'PASS'
-                    )
-                ]) {
-
-                    sh '''
-                    echo $PASS | docker login -u $USER --password-stdin
-                    '''
+                    echo "Building backend..."
                 }
             }
         }
+    }
 
-        stage('Push Backend') {
+    stage('Conditional Stage') {
 
-            steps {
+        when {
 
-                sh '''
-                docker push $DOCKER_USER_BACKEND:${BUILD_NUMBER}
-                '''
+            expression {
+
+                params.RUN_SECURITY_SCAN
+
             }
         }
 
-        stage('Push Frontend') {
+        steps {
 
-            steps {
-
-                sh '''
-                docker push $DOCKER_USER_FRONTEND:${BUILD_NUMBER}
-                '''
-            }
+            echo "Running security scan..."
         }
+    }
 
-        stage('Deploy') {
+    stage('Retry Example') {
 
-            steps {
+        steps {
 
-                sh '''
-                kubectl set image deployment/backend \
-                backend=$DOCKER_USER_BACKEND:${BUILD_NUMBER} \
-                -n employee-app
+            retry(3) {
 
-                kubectl set image deployment/frontend \
-                frontend=$DOCKER_USER_FRONTEND:${BUILD_NUMBER} \
-                -n employee-app
-                '''
+                echo "Trying operation..."
             }
         }
     }
+
+    stage('Script Block') {
+
+        steps {
+
+            script {
+
+                def buildType = "Release"
+
+                echo "Build Type: ${buildType}"
+            }
+        }
+    }
+
+    stage('Manual Approval') {
+
+        steps {
+
+            timeout(
+                time: 1,
+                unit: 'MINUTES'
+            ) {
+
+                input(
+                    message: 'Approve deployment?',
+                    ok: 'Deploy'
+                )
+            }
+        }
+    }
+
+    stage('Deploy DEV') {
+
+        when {
+
+            expression {
+
+                params.ENVIRONMENT == 'DEV'
+
+            }
+        }
+
+        steps {
+
+            echo "Deploying to DEV"
+        }
+    }
+
+    stage('Deploy UAT') {
+
+        when {
+
+            expression {
+
+                params.ENVIRONMENT == 'UAT'
+
+            }
+        }
+
+        steps {
+
+            echo "Deploying to UAT"
+        }
+    }
+
+    stage('Deploy PROD') {
+
+        when {
+
+            expression {
+
+                params.ENVIRONMENT == 'PROD'
+
+            }
+        }
+
+        steps {
+
+            echo "Deploying to PROD"
+        }
+    }
+
+    stage('Credentials Example') {
+
+        steps {
+
+            withCredentials([
+                usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'USER',
+                    passwordVariable: 'PASS'
+                )
+            ]) {
+
+                echo "Using credentials securely"
+            }
+        }
+    }
+
+    stage('Downstream Job Example') {
+
+        steps {
+
+            echo "Triggering another Jenkins job"
+
+            // build job: 'Deploy-Application'
+        }
+    }
+}
+
+post {
+
+    success {
+
+        echo "Pipeline Succeeded"
+    }
+
+    failure {
+
+        echo "Pipeline Failed"
+    }
+
+    aborted {
+
+        echo "Pipeline Aborted"
+    }
+
+    always {
+
+        echo "Cleanup Tasks"
+    }
+}
+```
+
 }
