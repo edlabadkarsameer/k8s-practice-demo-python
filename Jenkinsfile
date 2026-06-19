@@ -7,13 +7,8 @@ parameters {
 
     choice(
         name: 'ENV',
-        choices: ['DEV', 'UAT', 'PROD'],
-        description: 'Select environment'
-    )
-
-    string(
-        name: 'VERSION',
-        defaultValue: '1.0'
+        choices: "DEV\nUAT\nPROD",
+        description: 'Select Environment'
     )
 }
 
@@ -23,8 +18,7 @@ stages {
 
         steps {
 
-            echo "Environment = ${params.ENV}"
-            echo "Version = ${params.VERSION}"
+            echo "Selected ENV: ${params.ENV}"
         }
     }
 }
